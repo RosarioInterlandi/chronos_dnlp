@@ -1,8 +1,8 @@
 import pathlib
 import os
 import pandas as pd
-from dataset.tiingo.tiingo import get_daily_returns
-from dataset.tiingo.tiingo_tickers import (
+from tiingo.tiingo import get_daily_returns
+from tiingo.tiingo_tickers import (
     TICKERS,
 )
 
@@ -34,13 +34,13 @@ def download_and_cache_data(start_date, end_date):
 def get_daily_returns_data_cached(ticker: str = None) -> pd.DataFrame:
     current_path = pathlib.Path(__file__).resolve()
     parent_dir = current_path.parent
-    grandparent_dir = parent_dir.parent.parent  # transformer_ts
+    grandparent_dir = parent_dir.parent.parent  # chronos_dnlp
 
     if ticker:
         # Load a single stock
         df = pd.read_parquet(grandparent_dir / f"{DATA_DIR}/{ticker}.parquet")
     else:
-        # OR Load ALL stocks into one giant DataFrame (super fast with Parquet)
+        # OR Load ALL stocks into one single DataFrame (fast with Parquet)
         all_files = [
             grandparent_dir / os.path.join(DATA_DIR, f)
             for f in os.listdir(grandparent_dir / DATA_DIR)
