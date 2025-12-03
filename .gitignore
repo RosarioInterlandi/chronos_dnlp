@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.ipynb_checkpoints
+
+# Environment
+.env
+*.env
+*.DS_Store
+
+# Conda and pip artifacts
+*.egg-info/
+*.log
+
+
+# Compiled binaries
+*.so
+*.dll
+*.dylib
+
+# Data
+*.csv
+*.parquet
+
+# IDEs
+.vscode/
+.idea/
+
+# Tool Caches
+.pytest_cache/
+.ruff_cache/
+
+
