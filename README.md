@@ -8,3 +8,8 @@ To activate conda environment run:
 ```bash
 conda activate chronos_dnlp
 ```
+
+Before pushing a change remember to run: 
+* ```pytest```
+* ```black .```
+* ```ruff check . --fix```
