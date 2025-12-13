@@ -6,12 +6,9 @@
 ### Clone and Install
 Clone repo: 
 ```bash
-# Clone this repo with submodules
-git clone --recurse-submodules git@github.com:fpgmina/chronos_dnlp.git
+# Clone this repo 
+git clone git@github.com:fpgmina/chronos_dnlp.git
 cd chronos_dnlp
-
-# If you already cloned without submodules:
-git submodule update --init --recursive
 ```
 
 To create conda environment run:

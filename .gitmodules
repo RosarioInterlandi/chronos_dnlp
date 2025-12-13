@@ -1,3 +1,0 @@
-[submodule "external/chronos-forecasting"]
-	path = external/chronos-forecasting
-	url = https://github.com/amazon-science/chronos-forecasting.git
