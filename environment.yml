@@ -36,6 +36,8 @@ dependencies:
   - pip>=21.0
   - tqdm
 
+  - peft
+
   # Additional packages via pip
   - pip:
     - tiingo
