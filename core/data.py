@@ -8,6 +8,123 @@ import numpy as np
 import pandas as pd
 
 
+GICS_LEVEL_1 = {
+    "Information Technology": [
+        "AAPL",
+        "ADBE",
+        "ADI",
+        "AMD",
+        "AMAT",
+        "CSCO",
+        "FIS",
+        "IBM",
+        "INTC",
+        "INTU",
+        "LRCX",
+        "MSFT",
+        "MU",
+        "NVDA",
+        "ORCL",
+        "QCOM",
+        "TXN",
+    ],
+    "Health Care": [
+        "ABBV",
+        "ABT",
+        "AMGN",
+        "BDX",
+        "BMY",
+        "CVS",
+        "DHR",
+        "ELV",
+        "GILD",
+        "HUM",
+        "ISRG",
+        "JNJ",
+        "LLY",
+        "MRK",
+        "PFE",
+        "REGN",
+        "SYK",
+        "TMO",
+        "VRTX",
+        "ZTS",
+    ],
+    "Financials": [
+        "AIG",
+        "AXP",
+        "BAC",
+        "BLK",
+        "C",
+        "CB",
+        "CI",
+        "COF",
+        "GS",
+        "JPM",
+        "MET",
+        "MS",
+        "PNC",
+        "PGR",
+        "SCHW",
+        "USB",
+        "WFC",
+    ],
+    "Consumer Discretionary": [
+        "AMZN",
+        "BKNG",
+        "HD",
+        "LOW",
+        "MCD",
+        "META",
+        "NFLX",
+        "NKE",
+        "SBUX",
+        "TGT",
+        "TJX",
+    ],
+    "Consumer Staples": [
+        "CL",
+        "COST",
+        "EL",
+        "KMB",
+        "KO",
+        "MDLZ",
+        "MO",
+        "PEP",
+        "PG",
+        "PM",
+        "WMT",
+    ],
+    "Industrials": [
+        "BA",
+        "CAT",
+        "CSX",
+        "DE",
+        "EMR",
+        "ETN",
+        "FDX",
+        "GD",
+        "GE",
+        "HON",
+        "ITW",
+        "LMT",
+        "MMM",
+        "NSC",
+        "RTX",
+        "UNP",
+        "UPS",
+        "WM",
+    ],
+    "Energy": ["COP", "CVX", "EOG", "OXY", "SLB", "XOM"],
+    "Communication Services": ["CMCSA", "CRM", "GOOG", "GOOGL", "T", "TMUS", "VZ"],
+    "Materials": ["APD", "LIN", "SHW"],
+    "Real Estate": ["AMT", "SPG"],
+    "Utilities": [
+        # nessuna delle aziende fornite rientra qui
+    ],
+}
+
+
 def create_multivariate_windows(
     df: pd.DataFrame,
     context_length: int,
@@ -62,7 +179,7 @@ def create_multivariate_windows(
 
 def create_grouped_multivariate_windows(
     df: pd.DataFrame,
-    groups: Mapping[str, Iterable[str]],
+    groups: Mapping[str, Iterable[str]] | None,
     context_length: int,
     prediction_length: int,
     stride: int = 50,
@@ -77,7 +194,7 @@ def create_grouped_multivariate_windows(
     Args:
         df: Wide DataFrame with shape (T, N) where rows are dates and columns are stocks.
             Should be cleaned (no NaNs) before calling this function.
-        groups: Mapping of group name -> iterable of ticker symbols.
+        groups: Mapping of group name -> iterable of ticker symbols. When None, uses GICS_LEVEL_1.
         context_length: Number of historical timesteps the model sees as input.
         prediction_length: Number of future timesteps the model predicts.
         stride: Step size between consecutive windows. Default 50.
@@ -86,6 +203,9 @@ def create_grouped_multivariate_windows(
     Returns:
         List of dicts with "target" arrays and "group_id" values.
     """
+    # MODIFIED FUNCTION
+    # MODIFIED LINES
+    groups = GICS_LEVEL_1 if groups is None else groups
     inputs: list[Mapping[str, np.ndarray]] = []
     for group_idx, (_, tickers) in enumerate(groups.items()):
         available = [ticker for ticker in tickers if ticker in df.columns]

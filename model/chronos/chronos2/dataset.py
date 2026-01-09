@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 
 TensorOrArray: TypeAlias = torch.Tensor | np.ndarray
+TaskInput: TypeAlias = Mapping[str, TensorOrArray | Mapping[str, TensorOrArray | None] | int]
 
 
 def left_pad_and_cat_2D(tensors: list[torch.Tensor]) -> torch.Tensor:
@@ -38,8 +39,8 @@ def left_pad_and_cat_2D(tensors: list[torch.Tensor]) -> torch.Tensor:
 
 
 def validate_and_prepare_single_dict_task(
-    task: Mapping[str, TensorOrArray | Mapping[str, TensorOrArray]], idx: int, prediction_length: int
-) -> tuple[torch.Tensor, torch.Tensor, int, int, int]:
+    task: TaskInput, idx: int, prediction_length: int
+) -> tuple[torch.Tensor, torch.Tensor, int, int, int, int | None]:
     """Validates and prepares a single dictionary task for Chronos2Model.
 
     Parameters
@@ -54,6 +55,7 @@ def validate_and_prepare_single_dict_task(
         - `future_covariates` (optional): a dict of future values of known future covariates. The keys of the dict must be names of the
         covariates and values must be 1-d `torch.Tensor` or `np.ndarray` with length equal to the `prediction_length`. All keys in
         `future_covariates` must be a subset of the keys in `past_covariates`.
+        - `group_id` (optional): integer identifier used to group time series across tasks for group attention.
     idx
         Index of this task in the list of tasks, used for error messages
     prediction_length
@@ -72,7 +74,8 @@ def validate_and_prepare_single_dict_task(
     - task_n_future_covariates: Number of known future covariates
     """
 
-    allowed_keys = {"target", "past_covariates", "future_covariates"}
+    # MODIFIED FUNCTION
+    allowed_keys = {"target", "past_covariates", "future_covariates", "group_id"}  # MODIFIED LINES
 
     # validate keys
     keys = set(task.keys())
@@ -188,6 +191,14 @@ def validate_and_prepare_single_dict_task(
         (task_target.shape[0], prediction_length), fill_value=torch.nan, device=task_target.device
     )
 
+    # MODIFIED LINES
+    task_group_id = task.get("group_id")
+    if isinstance(task_group_id, np.generic):
+        task_group_id = int(task_group_id)
+    if task_group_id is not None and not isinstance(task_group_id, int):
+        raise ValueError(
+            f"Found invalid type for `group_id` in element at index {idx}. Expected int, but found {type(task_group_id)}"
+        )
     task_context_tensor = torch.cat([task_target, task_past_covariates_tensor], dim=0).to(dtype=torch.float32)
     task_future_covariates_tensor = torch.cat(
         [task_future_covariates_target_padding, task_future_covariates_tensor], dim=0
@@ -203,6 +214,7 @@ def validate_and_prepare_single_dict_task(
         task_n_targets,
         task_n_covariates,
         task_n_future_covariates,
+        task_group_id,
     )
 
 
@@ -392,6 +404,7 @@ class Chronos2Dataset(IterableDataset):
         - `future_covariates` (optional): a dict of future values of known future covariates. The keys of the dict must be names of the
         covariates and values must be 1-d `torch.Tensor` or `np.ndarray` with length equal to the `prediction_length`. All keys in
         `future_covariates` must be a subset of the keys in `past_covariates`.
+        - `group_id` (optional): integer identifier used to group time series across tasks for group attention.
         Note: when the mode is set to TRAIN, the values inside `future_covariates` are not technically used for training the model;
         however, this key is used to infer which covariates are known into the future. Therefore, if your task contains known future covariates,
         make sure that this key exists in `inputs`. The values of individual future covariates may be set to `None` or an empty array.
@@ -414,7 +427,7 @@ class Chronos2Dataset(IterableDataset):
 
     def __init__(
         self,
-        inputs: Sequence[Mapping[str, TensorOrArray | Mapping[str, TensorOrArray | None]]],
+        inputs: Sequence[TaskInput],
         context_length: int,
         prediction_length: int,
         batch_size: int,
@@ -435,11 +448,12 @@ class Chronos2Dataset(IterableDataset):
 
     @staticmethod
     def _prepare_tasks(
-        inputs: Sequence[Mapping[str, TensorOrArray | Mapping[str, TensorOrArray | None]]],
+        inputs: Sequence[TaskInput],
         prediction_length: int,
         min_past: int,
         mode: str | DatasetMode,
     ):
+        # MODIFIED FUNCTION
         tasks = []
         for idx, raw_task in enumerate(inputs):
             if mode != DatasetMode.TEST:
@@ -455,6 +469,7 @@ class Chronos2Dataset(IterableDataset):
 
             raw_task = cast(dict[str, TensorOrArray | Mapping[str, TensorOrArray]], raw_task)
             # convert to a format compatible with model's forward
+            # MODIFIED LINES
             task = validate_and_prepare_single_dict_task(raw_task, idx, prediction_length)
 
             if mode != DatasetMode.TEST and task[0].shape[-1] < min_past + prediction_length:
@@ -469,13 +484,17 @@ class Chronos2Dataset(IterableDataset):
             )
         return tasks
 
-    def _construct_slice(self, task_idx: int) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor, int]:
+    def _construct_slice(
+        self, task_idx: int
+    ) -> tuple[torch.Tensor, torch.Tensor | None, torch.Tensor, int, int | None]:
+        # MODIFIED FUNCTION
         (
             task_past_tensor,  # shape:  (task_n_targets + task_n_covariates, history_length)
             task_future_tensor,
             task_n_targets,
             task_n_covariates,
             task_n_future_covariates,
+            task_group_id,
         ) = self.tasks[task_idx]
         task_past_tensor, task_future_tensor = task_past_tensor.clone(), task_future_tensor.clone()
         task_n_past_only_covariates = task_n_covariates - task_n_future_covariates
@@ -533,10 +552,12 @@ class Chronos2Dataset(IterableDataset):
         # task_future_covariates: (task_n_targets + task_n_past_only_covariates + task_n_future_covariates, prediction_length),
         # the entries corresponding to targets and past-only covariates are NaNs
 
-        return task_context, task_future_target, task_future_covariates, task_n_targets
+        # MODIFIED LINES
+        return task_context, task_future_target, task_future_covariates, task_n_targets, task_group_id
 
     def _build_batch(self, task_indices: list[int]) -> dict[str, torch.Tensor | int | list[tuple[int, int]] | None]:
         """Build a batch from given task indices."""
+        # MODIFIED FUNCTION
         batch_context_tensor_list = []
         batch_future_target_tensor_list = []
         batch_future_covariates_tensor_list = []
@@ -545,10 +566,14 @@ class Chronos2Dataset(IterableDataset):
 
         target_start_idx = 0
         for group_id, task_idx in enumerate(task_indices):
-            task_context, task_future_target, task_future_covariates, task_n_targets = self._construct_slice(task_idx)
+            task_context, task_future_target, task_future_covariates, task_n_targets, task_group_id = (
+                self._construct_slice(task_idx)
+            )
 
             group_size = task_context.shape[0]
-            task_group_ids = torch.full((group_size,), fill_value=group_id)
+            # MODIFIED LINES
+            resolved_group_id = task_group_id if task_group_id is not None else group_id
+            task_group_ids = torch.full((group_size,), fill_value=resolved_group_id)
             batch_context_tensor_list.append(task_context)
             batch_future_target_tensor_list.append(task_future_target)
             batch_future_covariates_tensor_list.append(task_future_covariates)
@@ -623,7 +648,7 @@ class Chronos2Dataset(IterableDataset):
         cls,
         inputs: TensorOrArray
         | Sequence[TensorOrArray]
-        | Sequence[Mapping[str, TensorOrArray | Mapping[str, TensorOrArray | None]]],
+        | Sequence[TaskInput],
         context_length: int,
         prediction_length: int,
         batch_size: int,
@@ -632,6 +657,8 @@ class Chronos2Dataset(IterableDataset):
         mode: str | DatasetMode = DatasetMode.TRAIN,
     ) -> "Chronos2Dataset":
         """Convert from different input formats to a Chronos2Dataset."""
+        # MODIFIED FUNCTION
+        # MODIFIED LINES
         if isinstance(inputs, (torch.Tensor, np.ndarray)):
             inputs = convert_tensor_input_to_list_of_dicts_input(inputs)
         elif isinstance(inputs, list) and all([isinstance(x, (torch.Tensor, np.ndarray)) for x in inputs]):
