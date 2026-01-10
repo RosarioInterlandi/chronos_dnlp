@@ -223,7 +223,7 @@ def _train_and_eval(
         finetuned = pipeline.fit(
             inputs=train_inputs,
             validation_inputs=val_inputs,
-            prediction_length=int(config["prediction_length"]),
+            prediction_length=1,
             context_length=int(config["context_length"]),
             min_past=int(config["context_length"]),
             num_steps=int(config["num_steps"]),
@@ -315,7 +315,7 @@ def tune_hyperparams_for_dataframe(
             train_inputs = create_multivariate_windows(
                 train_df,
                 context_length=int(config["context_length"]),
-                prediction_length=int(config["prediction_length"]),
+                prediction_length=1,
                 stride=int(config["stride"]),
             )
             train_inputs, val_inputs = train_val_split(train_inputs, val_ratio=val_ratio)
@@ -448,7 +448,7 @@ def tune_hyperparams_for_dataframe_optuna(
             train_inputs = create_multivariate_windows(
                 train_df,
                 context_length=int(config["context_length"]),
-                prediction_length=int(config["prediction_length"]),
+                prediction_length=1,
                 stride=int(config["stride"]),
             )
             train_inputs, val_inputs = train_val_split(train_inputs, val_ratio=val_ratio)
